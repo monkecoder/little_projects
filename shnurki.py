@@ -110,6 +110,7 @@ def print_start_state(points, color="black", width=1, draw_points=True):
     t.speed(0)
     t.penup()
     t.hideturtle()
+    t.color("black")
 
     if draw_points:
         for point_tup in points:
@@ -134,7 +135,7 @@ def print_start_state(points, color="black", width=1, draw_points=True):
 
 
 def print_way(way, color="black", width=1):
-    t.speed(10)
+    t.speed(8)
     t.penup()
     t.hideturtle()
 
@@ -187,7 +188,7 @@ def search_in_history(found_ways, way):
     return matches_count
 
 
-def find_next_point_diag(points, this_point: Point, excluded_points=[], connect=True):
+def find_next_point_diag(points, this_point: Point, history=[], connect=True):
     """Ищет следующую точку при диагональной шнуровке."""
     len_p = len(points) * len(points[0])
     v0, h0 = this_point.pos_vertical, this_point.pos_horizontal
@@ -195,14 +196,22 @@ def find_next_point_diag(points, this_point: Point, excluded_points=[], connect=
     for points_tup in points:
         next_point: Point = points_tup[h1]
         v1 = next_point.pos_vertical
-        if next_point in excluded_points:  # если уже исключили эту точку, то не надо
-            continue
+        # if next_point in excluded_points:  # если уже исключили эту точку, то не надо
+        #     continue
         if v1 == v0:  # диагональное плетение, на том же уровне нельзя
             continue
+
+        way = restore_way(points)
+        way.append(next_point)  # обманка для проверки пути в истории
+        if search_in_history(history, way):
+            way.pop()
+            continue
+        way.pop()
+
         if -1 in next_point.nexts:  # если это выходная точка
-            way = restore_way(points)
             if len(way) < len_p - 1:  # можем выйти, только если прошли достаточно точек
                 continue
+
         if next_point.get_free_nexts():  # если есть свободные места подключения, то выбираем её
             if connect:
                 connect_points(this_point, next_point)
@@ -212,27 +221,36 @@ def find_next_point_diag(points, this_point: Point, excluded_points=[], connect=
 
 
 def find_connections(points_create_func):
-    points_copy = points_create_func()
-    sp = points_copy[0][0]
-    sp_prev = None
-    new_way = []
+    all_ways = []
+    points_len = points_create_func()
+    points_len = len(points_len) * len(points_len[0])
 
-    while True:
-        new_way.append(sp)
-        if sp.get_free_nexts() == 0:  # некуда подключать точку
-            sp_next_s = sp.get_true_nexts(sp_prev)
-            if len(sp_next_s) == 1:  # уже задано подключение к точке, переходим по нему
+    for _ in range(1000):
+        points_copy = points_create_func()
+        sp = points_copy[0][0]
+        sp_prev = None
+        new_way = []
+
+        while True:
+            new_way.append(sp)
+            if sp.get_free_nexts() == 0:  # некуда подключать точку
+                sp_next_s = sp.get_true_nexts(sp_prev)
+                if len(sp_next_s) == 1:  # уже задано подключение к точке, переходим по нему
+                    sp_prev = sp
+                    sp = sp_next_s[0]
+                    continue
+                break
+
+            sp_next = find_next_point_diag(points_copy, sp, all_ways)
+            if sp_next:  # нашли новую точку, подключили
                 sp_prev = sp
-                sp = sp_next_s[0]
+                sp = sp_next
                 continue
             break
 
-        sp_next = find_next_point_diag(points_copy, sp)
-        if sp_next:  # нашли новую точку, подключили
-            sp_prev = sp
-            sp = sp_next
-            continue
-        break
+        all_ways.append(new_way)
+
+    return [way for way in all_ways if len(way) == points_len]
 
 
 def create_points_connected():
@@ -246,17 +264,24 @@ def create_points_connected():
 
 
 if __name__ == "__main__":
+    import time
     example0 = create_points_connected()
-    print_points(example0)
-    # find_connections(example0)
-    print_start_state(example0, "blue", 3, True)
 
-    find_connections(create_points_connected)
+    found_ways0 = find_connections(create_points_connected)
 
-    _nw = restore_way(example0)
-    print([_p.repr_pos() for _p in _nw])
-    print_points(example0)
+    for way0 in found_ways0:
+        t.clear()
+        print_start_state(example0, "blue", 3, True)
+        print_way(way0, "red", 1)
+        # input()
+        time.sleep(1.5)
 
-    print_way(_nw, "red", 1)
+    # e = example0
+    # way1 = [e[0][0], e[3][1], e[4][1], e[1][0], e[2][0], e[5][1],
+    #         e[5][0], e[2][1], e[1][1], e[4][0], e[3][0], e[0][1]]
+    #
+    # t.clear()
+    # print_start_state(e, "blue", 3, True)
+    # print_way(way1, "red", 1)
 
     turtle.exitonclick()  # хз почему пайчарм не видит
