@@ -1,5 +1,5 @@
+import time
 import turtle
-from copy import deepcopy
 
 
 t = turtle.Turtle()
@@ -172,24 +172,24 @@ def restore_way(points):
 
 def search_in_history(found_ways, way):
     """Ищет совпадение пути c уже записанными путями шнуровки."""
-    matches_count = 0
-
     for found_way in found_ways:
-        is_matching = True
-        if len(found_way) < len(way):
+        if len(found_way) != len(way):
             continue
-        for i, point in enumerate(way):
-            if point != found_way[i]:
-                is_matching = False
-                break
-        if is_matching:
-            matches_count += 1
+        if way == found_way:
+            # print(True)
+            return 1
+        # for i, point in enumerate(way):
+        #     if point != found_way[i]:
+        #         continue
+        # return 1  # не найдено несовпадений, возвращаем успех
 
-    return matches_count
+    return 0  #
 
 
-def find_next_point_diag(points, this_point: Point, history=[], connect=True):
+def find_next_point_diag(points, this_point: Point, history=None, connect=True):
     """Ищет следующую точку при диагональной шнуровке."""
+    if history is None:
+        history = []
     len_p = len(points) * len(points[0])
     v0, h0 = this_point.pos_vertical, this_point.pos_horizontal
     h1 = h0 ^ 1  # диагональное плетение, шнурок идёт на другую линию
@@ -236,19 +236,29 @@ def find_connections(points_create_func):
             if sp.get_free_nexts() == 0:  # некуда подключать точку
                 sp_next_s = sp.get_true_nexts(sp_prev)
                 if len(sp_next_s) == 1:  # уже задано подключение к точке, переходим по нему
-                    sp_prev = sp
-                    sp = sp_next_s[0]
+                    sp_next = sp_next_s[0]
+                    new_way.append(sp_next)
+                    if search_in_history(all_ways, new_way):  # если переход уже есть, то исключаем
+                        new_way.pop()
+                        break
+                    new_way.pop()
+
+                    sp_prev, sp = sp, sp_next
                     continue
                 break
 
             sp_next = find_next_point_diag(points_copy, sp, all_ways)
             if sp_next:  # нашли новую точку, подключили
-                sp_prev = sp
-                sp = sp_next
+                sp_prev, sp = sp, sp_next
                 continue
             break
 
+        # if len(new_way) == 11:
+        #     print("???")
         all_ways.append(new_way)
+        # print([_p.repr_pos() for _p in new_way])
+        # print()
+        # time.sleep(1)
 
     return [way for way in all_ways if len(way) == points_len]
 
@@ -264,7 +274,6 @@ def create_points_connected():
 
 
 if __name__ == "__main__":
-    import time
     example0 = create_points_connected()
 
     found_ways0 = find_connections(create_points_connected)
